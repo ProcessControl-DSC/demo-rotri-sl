@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_template_form_plastic" model="ir.ui.view">
+        <field name="name">product.template.form.plastic.tax</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Impuesto plástico" name="plastic_tax">
+                    <group>
+                        <group string="Ley 7/2022">
+                            <field name="plastic_single_use"/>
+                            <field name="plastic_not_subject"
+                                   invisible="not plastic_single_use"/>
+                            <field name="kg_plastic_unit"
+                                   invisible="not plastic_single_use"/>
+                            <field name="kg_recycled_cert_unit"
+                                   invisible="not plastic_single_use"/>
+                            <field name="recycled_cert_ref"
+                                   invisible="not plastic_single_use"/>
+                            <field name="plastic_tax_product_id"
+                                   invisible="not plastic_single_use"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

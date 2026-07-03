@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_plastic_ledger_user,plastic.ledger.user,model_l10n_es_plastic_ledger,account.group_account_invoice,1,1,1,0
+access_plastic_ledger_manager,plastic.ledger.manager,model_l10n_es_plastic_ledger,account.group_account_manager,1,1,1,1

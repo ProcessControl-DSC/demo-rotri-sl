@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="account_move_form_plastic" model="ir.ui.view">
+        <field name="name">account.move.form.plastic.tax</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <div class="alert alert-warning" role="alert"
+                     invisible="not plastic_needs_generation">
+                    Esta factura tiene envases de plástico de un solo uso sujetos al
+                    impuesto (Ley 7/2022).
+                    <button name="action_generate_plastic_tax" type="object"
+                            string="Generar impuesto del plástico"
+                            class="btn-link"/>
+                </div>
+            </xpath>
+            <field name="fiscal_position_id" position="after">
+                <field name="plastic_exemption_reason"/>
+            </field>
+        </field>
+    </record>
+</odoo>

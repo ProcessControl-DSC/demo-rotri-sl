@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_plastic_592" model="ir.actions.report">
+        <field name="name">Borrador modelo 592 (impuesto plástico)</field>
+        <field name="model">l10n_es.plastic.ledger</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">pc_l10n_es_plastic_tax.report_plastic_592</field>
+        <field name="report_file">pc_l10n_es_plastic_tax.report_plastic_592</field>
+        <field name="binding_model_id" ref="model_l10n_es_plastic_ledger"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_plastic_592">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <h2>Borrador modelo 592 — Impuesto sobre envases de plástico no reutilizables</h2>
+                    <p class="text-muted">Ley 7/2022. Documento informativo, no oficial.</p>
+
+                    <h4>Sección contributiva</h4>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th><th>Referencia</th><th>Tipo</th>
+                                <th class="text-end">Kg</th><th class="text-end">Cuota</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="contrib" t-value="docs.filtered(lambda d: not d.exempt)"/>
+                            <tr t-foreach="contrib" t-as="d">
+                                <td><span t-field="d.date"/></td>
+                                <td><span t-field="d.name"/></td>
+                                <td><span t-field="d.entry_type"/></td>
+                                <td class="text-end"><span t-esc="'%.3f' % d.kg"/></td>
+                                <td class="text-end"><span t-esc="'%.2f' % d.amount"/></td>
+                            </tr>
+                            <tr style="font-weight:bold;border-top:2px solid #000">
+                                <td colspan="3">Total contributivo</td>
+                                <td class="text-end"><span t-esc="'%.3f' % sum(contrib.mapped('kg'))"/></td>
+                                <td class="text-end"><span t-esc="'%.2f' % sum(contrib.mapped('amount'))"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4>Sección exenciones</h4>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th><th>Referencia</th>
+                                <th class="text-end">Kg</th><th>Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="exent" t-value="docs.filtered(lambda d: d.exempt)"/>
+                            <tr t-foreach="exent" t-as="d">
+                                <td><span t-field="d.date"/></td>
+                                <td><span t-field="d.name"/></td>
+                                <td class="text-end"><span t-esc="'%.3f' % d.kg"/></td>
+                                <td><span t-field="d.exemption_reason"/></td>
+                            </tr>
+                            <tr style="font-weight:bold;border-top:2px solid #000">
+                                <td colspan="2">Total exento</td>
+                                <td class="text-end"><span t-esc="'%.3f' % sum(exent.mapped('kg'))"/></td>
+                                <td/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

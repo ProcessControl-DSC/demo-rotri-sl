@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Nota al pie legal en la factura (art. 82.8 / 75.1.c) -->
+    <template id="report_invoice_plastic_note"
+              inherit_id="account.report_invoice_document">
+        <xpath expr="//div[hasclass('page')]" position="inside">
+            <p t-if="o.plastic_footer_note" class="mt-3"
+               style="font-size:9px;border-top:1px solid #ccc;padding-top:4px">
+                <span t-field="o.plastic_footer_note"/>
+            </p>
+        </xpath>
+    </template>
+</odoo>

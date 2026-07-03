@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_tipa" model="product.product">
+        <field name="name">Impuesto Plástico (Contributivo)</field>
+        <field name="default_code">TIPA</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+        <field name="list_price">0.45</field>
+        <field name="standard_price">0.45</field>
+    </record>
+</odoo>

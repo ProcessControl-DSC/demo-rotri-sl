@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_plastic_ledger_list" model="ir.ui.view">
+        <field name="name">l10n_es.plastic.ledger.list</field>
+        <field name="model">l10n_es.plastic.ledger</field>
+        <field name="arch" type="xml">
+            <list string="Libro registro impuesto plástico">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="entry_type"/>
+                <field name="product_id"/>
+                <field name="kg" sum="Total kg"/>
+                <field name="amount" sum="Total cuota"/>
+                <field name="self_assessment"/>
+                <field name="exempt"/>
+                <field name="move_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_plastic_ledger_form" model="ir.ui.view">
+        <field name="name">l10n_es.plastic.ledger.form</field>
+        <field name="model">l10n_es.plastic.ledger</field>
+        <field name="arch" type="xml">
+            <form string="Movimiento libro registro">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="name"/>
+                            <field name="entry_type"/>
+                            <field name="product_id"/>
+                        </group>
+                        <group>
+                            <field name="kg"/>
+                            <field name="amount"/>
+                            <field name="self_assessment"/>
+                            <field name="exempt"/>
+                            <field name="exemption_reason" invisible="not exempt"/>
+                            <field name="move_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_plastic_ledger_search" model="ir.ui.view">
+        <field name="name">l10n_es.plastic.ledger.search</field>
+        <field name="model">l10n_es.plastic.ledger</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="product_id"/>
+                <filter name="type_sold" string="Vendido" domain="[('entry_type','=','sold')]"/>
+                <filter name="type_purchased" string="Adquirido" domain="[('entry_type','=','purchased')]"/>
+                <filter name="type_produced" string="Fabricado" domain="[('entry_type','=','produced')]"/>
+                <filter name="exempt" string="Exento" domain="[('exempt','=',True)]"/>
+                <separator/>
+                <filter name="group_type" string="Tipo" context="{'group_by':'entry_type'}"/>
+                <filter name="group_month" string="Mes" context="{'group_by':'date'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_plastic_ledger" model="ir.actions.act_window">
+        <field name="name">Libro registro impuesto plástico</field>
+        <field name="res_model">l10n_es.plastic.ledger</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_plastic_ledger"
+              name="Impuesto plástico (libro registro)"
+              parent="account.menu_finance_reports"
+              action="action_plastic_ledger"
+              sequence="99"/>
+</odoo>
