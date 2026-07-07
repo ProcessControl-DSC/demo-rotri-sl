@@ -12,6 +12,8 @@
                             <field name="plastic_single_use"/>
                             <field name="plastic_not_subject"
                                    invisible="not plastic_single_use"/>
+                            <field name="plastic_pct"
+                                   invisible="not plastic_single_use"/>
                             <field name="kg_plastic_unit"
                                    invisible="not plastic_single_use"/>
                             <field name="kg_recycled_cert_unit"

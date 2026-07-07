@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Impuesto sobre envases de plástico no reutilizables',
-    'version': '19.0.1.1.0',
+    'version': '19.0.2.0.0',
     'summary': 'Impuesto especial del plástico (Ley 7/2022) en compras y ventas',
     'description': """
 <div style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
@@ -23,7 +23,12 @@
 <li>Producto, pestaña Impuesto plástico: marcar Plástico de un solo uso, indicar Kg no reciclado/ud
 y, si aplica, Kg reciclado certificado + Ref. certificado. No sujeto (art. 72) lo excluye.</li>
 <li>Contacto, pestaña Ventas y Compras: fijar el modo de impuesto de cliente y/o proveedor.</li>
-<li>Compañía: informar el CIP del Registro territorial.</li>
+<li>Compañía (Ajustes, grupo Impuesto del plástico): CIP, tipo (0,45 EUR/kg),
+umbral minimis, periodo del 592 (mensual/trimestral), cuentas de impuesto repercutido
+(475) y gasto (631), cálculo de kg desde el peso, exención por posición fiscal,
+ocultar contrapartida en el PDF y registro de fabricación (por OF o agregado diario).</li>
+<li>Posición fiscal: marcar exenta y su motivo (exportación / intracomunitaria) para
+derivar la exención automáticamente en la factura.</li>
 </ul>
 
 <h3 style="color:#0f4c81">3. Uso en la factura</h3>
@@ -32,11 +37,13 @@ Generar impuesto del plástico. Al pulsarlo se añade la línea de tasa (con IVA
 en compra informativa o autoliquidación, su contrapartida (neto 0). Al imprimir la factura
 aparece la nota legal con importe y kg.</p>
 
-<h3 style="color:#0f4c81">4. Libro registro y modelo 592</h3>
-<p>En Contabilidad, Impuesto plástico (libro registro), se listan los movimientos
-(vendido / adquirido / fabricado / exento) con kg y cuota. Desde ahí, Imprimir, Borrador
-modelo 592 genera el resumen (sección contributiva que cuadra con la cuenta 475 y sección de
-exenciones).</p>
+<h3 style="color:#0f4c81">4. Libro registro, existencias y modelo 592</h3>
+<p>En Contabilidad, menú Impuesto plástico: el libro registro lista los movimientos
+(vendido / adquirido / fabricado / deducción / exento) con kg y cuota, exportable a CSV;
+las existencias muestran el stock mensual en kg por producto; y la regularización (art. 80)
+registra devoluciones, exportación posterior o destrucción. Los movimientos se registran al
+confirmar la factura (no en borrador). El borrador del modelo 592 resume la sección
+contributiva (cuadra con la cuenta configurada) y la de exenciones.</p>
 
 <h3 style="color:#0f4c81">5. Checklist de validación</h3>
 <ol>
@@ -74,6 +81,7 @@ prepara la información.</li>
         'views/product_views.xml',
         'views/res_partner_views.xml',
         'views/res_company_views.xml',
+        'views/account_fiscal_position_views.xml',
         'views/account_move_views.xml',
         'views/plastic_ledger_views.xml',
         'report/plastic_592_report.xml',

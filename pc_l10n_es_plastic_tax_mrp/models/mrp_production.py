@@ -20,27 +20,33 @@ class MrpProduction(models.Model):
             if prod.state != 'done':
                 continue
             tmpl = prod.product_id.product_tmpl_id
-            if not tmpl.plastic_single_use:
+            if not tmpl.plastic_single_use or tmpl.plastic_not_subject:
                 continue
             qty = prod.qty_produced or prod.product_qty
-            kg = net_kg({
-                'qty': qty,
-                'kg_plastic_unit': tmpl.kg_plastic_unit,
-                'kg_recycled_cert_unit': tmpl.kg_recycled_cert_unit,
-                'plastic_single_use': True,
-            })
+            kg = net_kg({'qty': qty, 'kg_plastic_unit': tmpl.kg_plastic_unit,
+                         'kg_recycled_cert_unit': tmpl.kg_recycled_cert_unit,
+                         'plastic_single_use': True})
             if kg <= 0:
                 continue
-            # idempotente por OF
-            Ledger.search([('production_id', '=', prod.id)]).unlink()
-            Ledger.create({
-                'name': prod.name,
-                'date': fields.Date.context_today(prod),
-                'entry_type': 'produced',
-                'product_id': prod.product_id.id,
-                'kg': round(kg, 4),
-                'amount': 0.0,
-                'production_id': prod.id,
-                'company_id': prod.company_id.id,
-            })
+            date = fields.Date.context_today(prod)
+            if prod.company_id.plastic_mo_registration == 'daily':
+                # agregar por día + producto (rendimiento a escala)
+                existing = Ledger.search([
+                    ('entry_type', '=', 'produced'), ('date', '=', date),
+                    ('product_id', '=', prod.product_id.id),
+                    ('company_id', '=', prod.company_id.id),
+                    ('production_id', '=', False)], limit=1)
+                if existing:
+                    existing.kg += round(kg, 4)
+                    continue
+                Ledger.create({
+                    'name': 'Fabricación %s' % date, 'date': date, 'entry_type': 'produced',
+                    'product_id': prod.product_id.id, 'kg': round(kg, 4), 'amount': 0.0,
+                    'company_id': prod.company_id.id})
+            else:
+                Ledger.search([('production_id', '=', prod.id)]).unlink()
+                Ledger.create({
+                    'name': prod.name, 'date': date, 'entry_type': 'produced',
+                    'product_id': prod.product_id.id, 'kg': round(kg, 4), 'amount': 0.0,
+                    'production_id': prod.id, 'company_id': prod.company_id.id})
         return res

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ===================== Libro registro ===================== -->
     <record id="view_plastic_ledger_list" model="ir.ui.view">
         <field name="name">l10n_es.plastic.ledger.list</field>
         <field name="model">l10n_es.plastic.ledger</field>
@@ -13,6 +14,7 @@
                 <field name="amount" sum="Total cuota"/>
                 <field name="self_assessment"/>
                 <field name="exempt"/>
+                <field name="move_state"/>
                 <field name="move_id"/>
             </list>
         </field>
@@ -52,9 +54,11 @@
             <search>
                 <field name="name"/>
                 <field name="product_id"/>
+                <filter name="posted" string="Facturas confirmadas" domain="['|',('move_state','=','posted'),('move_id','=',False)]"/>
                 <filter name="type_sold" string="Vendido" domain="[('entry_type','=','sold')]"/>
                 <filter name="type_purchased" string="Adquirido" domain="[('entry_type','=','purchased')]"/>
                 <filter name="type_produced" string="Fabricado" domain="[('entry_type','=','produced')]"/>
+                <filter name="type_deduction" string="Deducción" domain="[('entry_type','=','deduction')]"/>
                 <filter name="exempt" string="Exento" domain="[('exempt','=',True)]"/>
                 <separator/>
                 <filter name="group_type" string="Tipo" context="{'group_by':'entry_type'}"/>
@@ -63,15 +67,84 @@
         </field>
     </record>
 
+    <record id="action_export_ledger_csv" model="ir.actions.server">
+        <field name="name">Exportar libro registro (CSV)</field>
+        <field name="model_id" ref="model_l10n_es_plastic_ledger"/>
+        <field name="binding_model_id" ref="model_l10n_es_plastic_ledger"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_export_csv()</field>
+    </record>
+
     <record id="action_plastic_ledger" model="ir.actions.act_window">
         <field name="name">Libro registro impuesto plástico</field>
         <field name="res_model">l10n_es.plastic.ledger</field>
         <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_posted': 1}</field>
     </record>
 
-    <menuitem id="menu_plastic_ledger"
-              name="Impuesto plástico (libro registro)"
-              parent="account.menu_finance_reports"
-              action="action_plastic_ledger"
-              sequence="99"/>
+    <!-- ===================== Existencias (snapshot) ===================== -->
+    <record id="view_plastic_snapshot_list" model="ir.ui.view">
+        <field name="name">l10n_es.plastic.stock.snapshot.list</field>
+        <field name="model">l10n_es.plastic.stock.snapshot</field>
+        <field name="arch" type="xml">
+            <list string="Existencias plástico (kg)">
+                <field name="date"/>
+                <field name="product_id"/>
+                <field name="qty_on_hand"/>
+                <field name="kg_plastic" sum="Total kg"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_plastic_snapshot" model="ir.actions.act_window">
+        <field name="name">Existencias de plástico (kg)</field>
+        <field name="res_model">l10n_es.plastic.stock.snapshot</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <record id="action_generate_snapshot_server" model="ir.actions.server">
+        <field name="name">Generar existencias a hoy</field>
+        <field name="model_id" ref="model_l10n_es_plastic_stock_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_generate_snapshot()</field>
+    </record>
+
+    <!-- ===================== Regularización (deducción art. 80) ===================== -->
+    <record id="view_plastic_regularization_form" model="ir.ui.view">
+        <field name="name">l10n_es.plastic.regularization.form</field>
+        <field name="model">l10n_es.plastic.regularization</field>
+        <field name="arch" type="xml">
+            <form string="Regularización impuesto plástico">
+                <group>
+                    <field name="date"/>
+                    <field name="reason"/>
+                    <field name="product_id"/>
+                    <field name="kg"/>
+                    <field name="note"/>
+                </group>
+                <footer>
+                    <button string="Confirmar" type="object" name="action_confirm" class="btn-primary"/>
+                    <button string="Cancelar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_plastic_regularization" model="ir.actions.act_window">
+        <field name="name">Regularización impuesto plástico</field>
+        <field name="res_model">l10n_es.plastic.regularization</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- ===================== Menús ===================== -->
+    <menuitem id="menu_plastic_root" name="Impuesto plástico"
+              parent="account.menu_finance_reports" sequence="99"/>
+    <menuitem id="menu_plastic_ledger" name="Libro registro"
+              parent="menu_plastic_root" action="action_plastic_ledger" sequence="10"/>
+    <menuitem id="menu_plastic_snapshot" name="Existencias (kg)"
+              parent="menu_plastic_root" action="action_plastic_snapshot" sequence="20"/>
+    <menuitem id="menu_plastic_regularization" name="Regularización (art. 80)"
+              parent="menu_plastic_root" action="action_plastic_regularization" sequence="30"/>
 </odoo>

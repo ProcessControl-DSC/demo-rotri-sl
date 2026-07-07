@@ -8,33 +8,50 @@ class TestAccountMovePlastic(TransactionCase):
     def setUp(self):
         super().setUp()
         self.company = self.env.company
-        # Solo tiene sentido con plan contable cargado
         self.has_chart = bool(self.company.chart_template)
 
-    def _plastic_product(self):
+    def _plastic_product(self, kg=0.5, rec=0.0):
         return self.env['product.product'].create({
-            'name': 'Bolsa plástico test',
-            'type': 'consu',
-            'plastic_single_use': True,
-            'kg_plastic_unit': 0.5,
-        })
+            'name': 'Bolsa plástico test', 'type': 'consu',
+            'plastic_single_use': True, 'kg_plastic_unit': kg,
+            'kg_recycled_cert_unit': rec})
+
+    def _invoice(self, partner, prod, qty=100):
+        return self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': partner.id,
+            'invoice_date': '2026-05-04',
+            'invoice_line_ids': [(0, 0, {
+                'product_id': prod.id, 'quantity': qty, 'price_unit': 1.0})]})
 
     def test_generate_sale_tax_line(self):
         if not self.has_chart:
-            self.skipTest("Sin plan contable en la BD de test")
+            self.skipTest("Sin plan contable")
         partner = self.env['res.partner'].create({
             'name': 'Cliente plástico', 'plastic_tax_customer_mode': 'info_included'})
-        prod = self._plastic_product()
-        move = self.env['account.move'].create({
-            'move_type': 'out_invoice',
-            'partner_id': partner.id,
-            'invoice_line_ids': [(0, 0, {
-                'product_id': prod.id, 'quantity': 100, 'price_unit': 1.0})],
-        })
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
         self.assertTrue(move.plastic_needs_generation)
         move.action_generate_plastic_tax()
-        tax_lines = move.invoice_line_ids.filtered('is_plastic_tax_line')
-        self.assertEqual(len(tax_lines), 1)
-        # 100 u x 0,5 kg = 50 kg x 0,45 = 22,5
-        self.assertAlmostEqual(tax_lines.price_total and tax_lines.price_subtotal, 22.5, places=2)
-        self.assertFalse(move.plastic_needs_generation)  # ya generado
+        tax = move.invoice_line_ids.filtered('is_plastic_tax_line')
+        self.assertEqual(len(tax), 1)
+        self.assertAlmostEqual(tax.price_subtotal, 22.5, places=2)  # 100*0.5*0.45
+        self.assertFalse(move.plastic_needs_generation)
+        # libro registro solo al confirmar
+        self.assertEqual(self.env['l10n_es.plastic.ledger'].search_count(
+            [('move_id', '=', move.id)]), 0)
+        move.action_post()
+        self.assertEqual(self.env['l10n_es.plastic.ledger'].search_count(
+            [('move_id', '=', move.id), ('exempt', '=', False)]), 1)
+
+    def test_exemption_reason_no_tax(self):
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        partner = self.env['res.partner'].create({
+            'name': 'Cliente export', 'plastic_tax_customer_mode': 'info_included'})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        move.plastic_exemption_reason = 'export'
+        move.action_generate_plastic_tax()
+        self.assertFalse(move.invoice_line_ids.filtered('is_plastic_tax_line'))
+        self.assertIn('75.1.c', move.plastic_footer_note or '')
+        move.action_post()
+        led = self.env['l10n_es.plastic.ledger'].search([('move_id', '=', move.id)])
+        self.assertTrue(led.exempt)
