@@ -19,12 +19,12 @@ class MrpProduction(models.Model):
         for prod in self:
             if prod.state != 'done':
                 continue
-            tmpl = prod.product_id.product_tmpl_id
-            if not tmpl.plastic_single_use or tmpl.plastic_not_subject:
+            e = prod.product_id.plastic_effective()
+            if not e['plastic_single_use'] or e['plastic_not_subject']:
                 continue
             qty = prod.qty_produced or prod.product_qty
-            kg = net_kg({'qty': qty, 'kg_plastic_unit': tmpl.kg_plastic_unit,
-                         'kg_recycled_cert_unit': tmpl.kg_recycled_cert_unit,
+            kg = net_kg({'qty': qty, 'kg_plastic_unit': e['kg_plastic_unit'],
+                         'kg_recycled_cert_unit': e['kg_recycled_cert_unit'],
                          'plastic_single_use': True})
             if kg <= 0:
                 continue

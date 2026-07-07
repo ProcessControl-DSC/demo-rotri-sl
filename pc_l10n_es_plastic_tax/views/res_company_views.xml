@@ -15,11 +15,14 @@
                         <field name="plastic_tax_minimis_kg"/>
                         <field name="plastic_tax_period"/>
                         <field name="plastic_mo_registration"/>
+                        <field name="plastic_snapshot_interval"/>
                     </group>
                     <group>
                         <field name="plastic_tax_account_output_id"/>
                         <field name="plastic_tax_account_expense_id"/>
                         <field name="plastic_kg_from_weight"/>
+                        <field name="plastic_weight_field_id"
+                               invisible="not plastic_kg_from_weight"/>
                         <field name="plastic_exempt_from_fiscal_pos"/>
                         <field name="plastic_hide_counterpart_pdf"/>
                     </group>

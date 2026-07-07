@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Impuesto sobre envases de plástico no reutilizables',
-    'version': '19.0.2.0.0',
+    'version': '19.0.3.0.0',
     'summary': 'Impuesto especial del plástico (Ley 7/2022) en compras y ventas',
     'description': """
 <div style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
@@ -67,6 +67,29 @@ quedan como mejora posterior.</li>
 <li>El envío real del 592 a la AEAT y la certificación del reciclado son externos; el módulo
 prepara la información.</li>
 </ul>
+<h3 style="color:#0f4c81">7. Kg desde el peso y datos por variante</h3>
+<ul>
+<li>Por defecto los kg de plástico se introducen a mano en el producto. Si se activa
+"Calcular kg desde el peso" en la compañía, se calculan como peso x % plástico; el
+campo de peso origen es configurable (por defecto el peso estándar del producto).</li>
+<li>Si un producto tiene variantes con distinto plástico, active "Datos de plástico por
+variante" en el producto: los kg, % y reciclado se definen por variante (si no, el valor
+del producto aplica a todas).</li>
+<li>Las existencias en kg se generan con una acción planificada cuya periodicidad
+(mensual/trimestral/anual) se configura en la compañía.</li>
+</ul>
+
+<h3 style="color:#0f4c81">8. Carga inicial (cutover)</h3>
+<p>Para poner en marcha el módulo en un cliente se usa la importación estándar de Odoo
+(menú de cada modelo, botón Favoritos, Importar registros) desde un CSV:</p>
+<ul>
+<li>Productos: referencia interna, plástico de un solo uso, kg no reciclado/ud (o % si se
+calcula desde el peso), kg reciclado certificado y su referencia.</li>
+<li>Contactos: modo de impuesto de cliente y de proveedor.</li>
+<li>Compañía: CIP y cuentas del impuesto.</li>
+<li>Saldo inicial de existencias: generar el snapshot de existencias a la fecha de cutover
+desde el menú Impuesto plástico, Existencias.</li>
+</ul>
 <p style="color:#59748c">Process Control — módulo pc_l10n_es_plastic_tax (Odoo 19).</p>
 </div>
 """,
@@ -78,6 +101,7 @@ prepara la información.</li>
     'data': [
         'security/ir.model.access.csv',
         'data/plastic_tax_data.xml',
+        'data/plastic_cron.xml',
         'views/product_views.xml',
         'views/res_partner_views.xml',
         'views/res_company_views.xml',

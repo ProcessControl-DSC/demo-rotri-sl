@@ -10,6 +10,8 @@
                     <group>
                         <group string="Ley 7/2022">
                             <field name="plastic_single_use"/>
+                            <field name="plastic_variant_specific"
+                                   invisible="not plastic_single_use"/>
                             <field name="plastic_not_subject"
                                    invisible="not plastic_single_use"/>
                             <field name="plastic_pct"
@@ -23,6 +25,28 @@
                             <field name="plastic_tax_product_id"
                                    invisible="not plastic_single_use"/>
                         </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="product_variant_form_plastic" model="ir.ui.view">
+        <field name="name">product.product.form.plastic.tax</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Impuesto plástico" name="plastic_tax_var"
+                      invisible="not product_tmpl_id or not plastic_variant_specific">
+                    <group string="Datos por variante (Ley 7/2022)">
+                        <field name="plastic_variant_specific" invisible="1"/>
+                        <field name="plastic_single_use_var"/>
+                        <field name="plastic_not_subject_var"/>
+                        <field name="plastic_pct_var"/>
+                        <field name="kg_plastic_unit_var"/>
+                        <field name="kg_recycled_cert_unit_var"/>
+                        <field name="plastic_tax_product_var_id"/>
                     </group>
                 </page>
             </xpath>

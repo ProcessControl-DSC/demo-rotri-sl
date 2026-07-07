@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="ir_cron_plastic_snapshot" model="ir.cron">
+        <field name="name">Impuesto plástico: snapshot de existencias</field>
+        <field name="model_id" ref="model_l10n_es_plastic_stock_snapshot"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate_snapshots()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">months</field>
+        <field name="active" eval="False"/>
+    </record>
+</odoo>

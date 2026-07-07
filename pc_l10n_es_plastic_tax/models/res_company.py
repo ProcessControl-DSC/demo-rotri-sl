@@ -25,6 +25,11 @@ class ResCompany(models.Model):
         string='Calcular kg desde el peso',
         help='Si se activa, los kg de plástico se calculan como peso del producto '
              'por el porcentaje de plástico, en lugar de introducirlos a mano.')
+    plastic_weight_field_id = fields.Many2one(
+        'ir.model.fields', string='Campo de peso origen',
+        domain="[('model','=','product.template'),('ttype','in',['float','monetary','integer'])]",
+        help='Campo del producto del que se toma el peso técnico para calcular los kg '
+             'de plástico. Por defecto el peso estándar del producto.')
     plastic_exempt_from_fiscal_pos = fields.Boolean(
         string='Exención por posición fiscal', default=True,
         help='Deriva la exención (exportación / intracomunitaria) de la posición '
@@ -34,3 +39,24 @@ class ResCompany(models.Model):
     plastic_mo_registration = fields.Selection(
         [('per_mo', 'Por orden de fabricación'), ('daily', 'Agregado diario')],
         string='Registro de fabricación', default='per_mo')
+    plastic_snapshot_interval = fields.Selection(
+        [('month', 'Mensual'), ('quarter', 'Trimestral'), ('year', 'Anual')],
+        string='Periodicidad existencias', default='month',
+        help='Cada cuánto la acción planificada genera el snapshot de existencias en kg.')
+
+    _PLASTIC_SNAP_CRON = 'pc_l10n_es_plastic_tax.ir_cron_plastic_snapshot'
+
+    def _sync_plastic_snapshot_cron(self):
+        cron = self.env.ref(self._PLASTIC_SNAP_CRON, raise_if_not_found=False)
+        if not cron:
+            return
+        mapping = {'month': (1, 'months'), 'quarter': (3, 'months'), 'year': (1, 'years')}
+        interval = self.env.company.plastic_snapshot_interval or 'month'
+        num, typ = mapping[interval]
+        cron.sudo().write({'interval_number': num, 'interval_type': typ})
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'plastic_snapshot_interval' in vals:
+            self._sync_plastic_snapshot_cron()
+        return res

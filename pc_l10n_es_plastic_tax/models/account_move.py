@@ -69,11 +69,11 @@ class AccountMove(models.Model):
         total = 0.0
         for l in self.invoice_line_ids.filtered(
                 lambda x: x.display_type == 'product' and not x.is_plastic_tax_line):
-            tmpl = l.product_id.product_tmpl_id
+            e = l.product_id.plastic_effective()
             total += net_kg({
-                'qty': l.quantity, 'kg_plastic_unit': tmpl.kg_plastic_unit,
-                'kg_recycled_cert_unit': tmpl.kg_recycled_cert_unit,
-                'plastic_single_use': tmpl.plastic_single_use and not tmpl.plastic_not_subject,
+                'qty': l.quantity, 'kg_plastic_unit': e['kg_plastic_unit'],
+                'kg_recycled_cert_unit': e['kg_recycled_cert_unit'],
+                'plastic_single_use': e['plastic_single_use'] and not e['plastic_not_subject'],
             })
         return total
 
@@ -144,13 +144,13 @@ class AccountMove(models.Model):
                 lambda l: l.display_type == 'product' and not l.is_plastic_tax_line)
             calc, prod_by_key = [], {}
             for l in src:
-                tmpl = l.product_id.product_tmpl_id
-                kp = tmpl.plastic_tax_product_id or default_prod
+                e = l.product_id.plastic_effective()
+                kp = e['tax_product'] or default_prod
                 key = kp.id if kp else 0
                 prod_by_key[key] = kp
-                calc.append({'qty': l.quantity, 'kg_plastic_unit': tmpl.kg_plastic_unit,
-                             'kg_recycled_cert_unit': tmpl.kg_recycled_cert_unit,
-                             'plastic_single_use': tmpl.plastic_single_use and not tmpl.plastic_not_subject,
+                calc.append({'qty': l.quantity, 'kg_plastic_unit': e['kg_plastic_unit'],
+                             'kg_recycled_cert_unit': e['kg_recycled_cert_unit'],
+                             'plastic_single_use': e['plastic_single_use'] and not e['plastic_not_subject'],
                              'tariff_key': key})
             res = compute_plastic_tax_lines(calc, mode, is_sale, rate=rate, minimis_kg=0.0)
             if not res:

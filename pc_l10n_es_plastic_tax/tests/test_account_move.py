@@ -42,6 +42,24 @@ class TestAccountMovePlastic(TransactionCase):
         self.assertEqual(self.env['l10n_es.plastic.ledger'].search_count(
             [('move_id', '=', move.id), ('exempt', '=', False)]), 1)
 
+    def test_variant_specific_kg(self):
+        # plástico por variante: cada variante con su kg
+        attr = self.env['product.attribute'].create({'name': 'Talla PT'})
+        v1, v2 = self.env['product.attribute.value'].create([
+            {'name': 'S', 'attribute_id': attr.id}, {'name': 'L', 'attribute_id': attr.id}])
+        tmpl = self.env['product.template'].create({
+            'name': 'Envase variante', 'type': 'consu',
+            'plastic_single_use': True, 'plastic_variant_specific': True,
+            'attribute_line_ids': [(0, 0, {'attribute_id': attr.id,
+                                           'value_ids': [(6, 0, [v1.id, v2.id])]})]})
+        variants = tmpl.product_variant_ids
+        variants[0].write({'plastic_single_use_var': True, 'kg_plastic_unit_var': 0.2})
+        variants[1].write({'plastic_single_use_var': True, 'kg_plastic_unit_var': 0.8})
+        e0 = variants[0].plastic_effective()
+        e1 = variants[1].plastic_effective()
+        self.assertEqual(e0['kg_plastic_unit'], 0.2)
+        self.assertEqual(e1['kg_plastic_unit'], 0.8)
+
     def test_exemption_reason_no_tax(self):
         if not self.has_chart:
             self.skipTest("Sin plan contable")

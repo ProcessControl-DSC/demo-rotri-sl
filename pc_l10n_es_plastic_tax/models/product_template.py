@@ -5,6 +5,10 @@ from odoo import api, fields, models
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
+    plastic_variant_specific = fields.Boolean(
+        string='Datos de plástico por variante',
+        help='Si se activa, los datos de plástico (kg, %, reciclado) se definen a '
+             'nivel de variante. Si no, el valor del producto aplica a todas.')
     plastic_single_use = fields.Boolean(
         string='Plástico de un solo uso',
         help='El producto es un envase de plástico no reutilizable sujeto a la Ley 7/2022.')
@@ -33,10 +37,12 @@ class ProductTemplate(models.Model):
              'Si se deja vacío se usa el producto de tasa por defecto del módulo.')
 
     @api.depends('weight', 'plastic_pct', 'plastic_single_use',
-                 'company_id.plastic_kg_from_weight')
+                 'company_id.plastic_kg_from_weight', 'company_id.plastic_weight_field_id')
     def _compute_kg_plastic_unit(self):
         for tmpl in self:
             company = tmpl.company_id or self.env.company
             if company.plastic_kg_from_weight and tmpl.plastic_single_use:
-                tmpl.kg_plastic_unit = (tmpl.weight or 0.0) * (tmpl.plastic_pct or 0.0)
+                fname = company.plastic_weight_field_id.name or 'weight'
+                weight = tmpl[fname] if fname in tmpl._fields else (tmpl.weight or 0.0)
+                tmpl.kg_plastic_unit = (weight or 0.0) * (tmpl.plastic_pct or 0.0)
             # si no, se mantiene el valor manual (readonly=False + store)

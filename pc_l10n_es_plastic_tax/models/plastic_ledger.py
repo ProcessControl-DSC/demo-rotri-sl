@@ -66,17 +66,25 @@ class PlasticStockSnapshot(models.Model):
                                  default=lambda self: self.env.company)
 
     @api.model
+    def _cron_generate_snapshots(self):
+        for company in self.env['res.company'].search([]):
+            self.with_company(company).action_generate_snapshot()
+
+    @api.model
     def action_generate_snapshot(self, date=None):
         """Genera el snapshot de existencias en kg de plástico a la fecha dada."""
         date = date or fields.Date.context_today(self)
         company = self.env.company
         self.search([('date', '=', date), ('company_id', '=', company.id)]).unlink()
         prods = self.env['product.product'].search([
-            ('product_tmpl_id.plastic_single_use', '=', True)])
+            '|', ('product_tmpl_id.plastic_single_use', '=', True),
+            ('plastic_single_use_var', '=', True)])
         created = self.env['l10n_es.plastic.stock.snapshot']
         for p in prods:
-            tmpl = p.product_tmpl_id
-            net = max(0.0, tmpl.kg_plastic_unit - tmpl.kg_recycled_cert_unit)
+            e = p.plastic_effective()
+            if not e['plastic_single_use'] or e['plastic_not_subject']:
+                continue
+            net = max(0.0, e['kg_plastic_unit'] - e['kg_recycled_cert_unit'])
             qty = p.with_company(company).qty_available
             if qty:
                 created |= self.create({
