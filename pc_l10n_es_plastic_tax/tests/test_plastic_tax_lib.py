@@ -13,13 +13,24 @@ def _line(qty, kg, rec=0.0, plastic=True, key='A'):
 @tagged('post_install', '-at_install')
 class TestPlasticTaxLib(TransactionCase):
 
-    def test_01_venta_contributiva_1_tarifa(self):
-        r = compute_plastic_tax_lines([_line(100, 0.1)], 'info_included', True)
+    def test_01_venta_agregada_cargo(self):
+        # venta agregada = cargo real, una sola línea
+        r = compute_plastic_tax_lines([_line(100, 0.1)], 'aggregated', True)
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]['kg'], 10.0)
         self.assertEqual(r[0]['amount'], 4.5)
-        self.assertEqual(r[0]['sign'], 1)
         self.assertEqual(r[0]['kind'], 'tax')
+        self.assertTrue(r[0]['charged'])
+
+    def test_01b_venta_informativa_neto0(self):
+        # venta informativa (incluida) = línea + contrapartida, neto 0, no cargo
+        r = compute_plastic_tax_lines([_line(100, 0.1)], 'info_included', True)
+        self.assertEqual(len(r), 2)
+        tax = [x for x in r if x['kind'] == 'tax'][0]
+        cp = [x for x in r if x['kind'] == 'counterpart'][0]
+        self.assertFalse(tax['charged'])
+        self.assertEqual(cp['cp_kind'], 'cost')
+        self.assertEqual(tax['amount'], cp['amount'])
 
     def test_02_venta_2_tarifas(self):
         r = compute_plastic_tax_lines(
@@ -44,6 +55,8 @@ class TestPlasticTaxLib(TransactionCase):
         r = compute_plastic_tax_lines([_line(100, 0.1)], 'self_assessment', False)
         self.assertEqual(len(r), 2)
         self.assertTrue(all(x['self_assessment'] for x in r))
+        cp = [x for x in r if x['kind'] == 'counterpart'][0]
+        self.assertEqual(cp['cp_kind'], 'autoliq')
 
     def test_05_compra_aggregated(self):
         r = compute_plastic_tax_lines([_line(100, 0.1)], 'aggregated', False)
@@ -64,7 +77,7 @@ class TestPlasticTaxLib(TransactionCase):
 
     def test_08_linea_sin_plastico_ignorada(self):
         r = compute_plastic_tax_lines(
-            [_line(100, 0.1, plastic=False), _line(100, 0.1)], 'info_included', True)
+            [_line(100, 0.1, plastic=False), _line(100, 0.1)], 'aggregated', True)
         self.assertEqual(len(r), 1)
         self.assertEqual(r[0]['kg'], 10.0)
 

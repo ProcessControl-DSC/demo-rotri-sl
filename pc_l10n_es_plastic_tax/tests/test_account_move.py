@@ -27,7 +27,7 @@ class TestAccountMovePlastic(TransactionCase):
         if not self.has_chart:
             self.skipTest("Sin plan contable")
         partner = self.env['res.partner'].create({
-            'name': 'Cliente plástico', 'plastic_tax_customer_mode': 'info_included'})
+            'name': 'Cliente plástico', 'plastic_tax_customer_mode': 'aggregated'})
         move = self._invoice(partner, self._plastic_product(kg=0.5))
         self.assertTrue(move.plastic_needs_generation)
         move.action_generate_plastic_tax()

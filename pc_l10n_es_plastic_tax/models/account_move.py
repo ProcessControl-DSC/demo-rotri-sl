@@ -42,12 +42,19 @@ class AccountMove(models.Model):
         return 'none', False
 
     def _plastic_exemption(self):
-        """Devuelve (exento, motivo_label). Prioridad: campo manual > posición fiscal."""
+        """Devuelve (exento, motivo_label). Prioridad: campo manual > posición fiscal.
+
+        La exención por posición fiscal solo aplica a VENTAS (entregas exentas). En
+        compras intracomunitarias no hay exención: se autoliquida por el modo del
+        proveedor. El motivo manual, si se informa, prevalece en ambos sentidos.
+        """
         self.ensure_one()
         if self.plastic_exemption_reason:
             return True, dict(EXEMPTION_REASONS).get(self.plastic_exemption_reason)
+        is_sale = self.move_type in ('out_invoice', 'out_refund')
         fp = self.fiscal_position_id
-        if (self.company_id.plastic_exempt_from_fiscal_pos and fp and fp.plastic_exempt):
+        if (is_sale and self.company_id.plastic_exempt_from_fiscal_pos
+                and fp and fp.plastic_exempt):
             label = dict(EXEMPTION_REASONS).get(fp.plastic_exempt_reason) or _('exenta')
             return True, label
         return False, None
@@ -160,6 +167,7 @@ class AccountMove(models.Model):
             sale_tax = company.account_sale_tax_id if is_sale else False
             acc_out = company.plastic_tax_account_output_id
             acc_exp = company.plastic_tax_account_expense_id
+            acc_cost = company.plastic_tax_account_cost_id
             new_lines, tot_amount, tot_kg = [], 0.0, 0.0
             for r in res:
                 prod = prod_by_key.get(r['tariff_key']) or default_prod
@@ -173,11 +181,15 @@ class AccountMove(models.Model):
                              % {'rate': rate, 'kg': r['kg']} if r['kind'] == 'tax'
                              else _('Impuesto plástico - contrapartida')),
                 }
-                if r['kind'] == 'tax' and acc_out:
-                    vals['account_id'] = acc_out.id
-                elif r['kind'] == 'counterpart' and acc_exp:
-                    vals['account_id'] = acc_exp.id
-                if is_sale and r['kind'] == 'tax' and sale_tax:
+                if r['kind'] == 'tax':
+                    if acc_out:
+                        vals['account_id'] = acc_out.id
+                else:  # contrapartida: coste (informativa) o autoliquidación (UE)
+                    cp_acc = acc_exp if r.get('cp_kind') == 'autoliq' else acc_cost
+                    if cp_acc:
+                        vals['account_id'] = cp_acc.id
+                # IVA solo en el cargo real de venta (agregada); nunca en el neto 0
+                if is_sale and r['kind'] == 'tax' and r.get('charged') and sale_tax:
                     vals['tax_ids'] = [(6, 0, sale_tax.ids)]
                 else:
                     vals['tax_ids'] = [(5, 0, 0)]

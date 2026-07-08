@@ -57,23 +57,18 @@ def compute_plastic_tax_lines(invoice_lines, party_mode, is_sale,
     if sum(tariff_kgs.values()) < minimis_kg:
         return []
 
+    # 'aggregated' => cargo real (una sola línea). 'info_included'/'self_assessment'
+    # => la tasa ya está en el precio => línea + contrapartida (neto 0).
+    charged = (party_mode == 'aggregated')
+    sa = (party_mode == 'self_assessment')
+    cp_kind = 'autoliq' if sa else 'cost'
     result = []
     for key, kg in tariff_kgs.items():
         amount = round(kg * rate, 2)
         kg = round(kg, 4)
-        if is_sale:
-            # Venta contributiva: línea positiva sujeta a IVA
-            result.append({'tariff_key': key, 'kg': kg, 'amount': amount,
-                           'sign': 1, 'kind': 'tax', 'self_assessment': False})
-        elif party_mode == 'aggregated':
-            # Compra agregada: la tasa viene aparte del proveedor
-            result.append({'tariff_key': key, 'kg': kg, 'amount': amount,
-                           'sign': 1, 'kind': 'tax', 'self_assessment': False})
-        else:
-            # info_included o self_assessment: tasa + contrapartida (neto 0)
-            sa = (party_mode == 'self_assessment')
-            result.append({'tariff_key': key, 'kg': kg, 'amount': amount,
-                           'sign': 1, 'kind': 'tax', 'self_assessment': sa})
-            result.append({'tariff_key': key, 'kg': kg, 'amount': amount,
-                           'sign': -1, 'kind': 'counterpart', 'self_assessment': sa})
+        result.append({'tariff_key': key, 'kg': kg, 'amount': amount, 'sign': 1,
+                       'kind': 'tax', 'self_assessment': sa, 'charged': charged})
+        if not charged:
+            result.append({'tariff_key': key, 'kg': kg, 'amount': amount, 'sign': -1,
+                           'kind': 'counterpart', 'self_assessment': sa, 'cp_kind': cp_kind})
     return result
