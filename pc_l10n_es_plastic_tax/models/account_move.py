@@ -185,6 +185,7 @@ class AccountMove(models.Model):
                     if acc_out:
                         vals['account_id'] = acc_out.id
                 else:  # contrapartida: coste (informativa) o autoliquidación (UE)
+                    vals['is_plastic_counterpart'] = True
                     cp_acc = acc_exp if r.get('cp_kind') == 'autoliq' else acc_cost
                     if cp_acc:
                         vals['account_id'] = cp_acc.id
@@ -224,8 +225,11 @@ class AccountMove(models.Model):
                     'exempt': True, 'exemption_reason': reason,
                     'move_id': move.id, 'company_id': move.company_id.id})
                 continue
+            mode, _is = move._plastic_party_mode()
+            sa = (mode == 'self_assessment')
             for l in move.invoice_line_ids.filtered(
-                    lambda x: x.is_plastic_tax_line and x.price_unit > 0):
+                    lambda x: x.is_plastic_tax_line and not x.is_plastic_counterpart
+                    and x.price_unit > 0):
                 sign = -1 if is_refund else 1
                 Ledger.create({
                     'name': move.name or _('Factura'),
@@ -234,6 +238,7 @@ class AccountMove(models.Model):
                     'product_id': l.product_id.id,
                     'kg': round(l.quantity * sign, 4),
                     'amount': round(l.price_subtotal * sign, 2),
+                    'self_assessment': sa,
                     'move_id': move.id, 'company_id': move.company_id.id})
 
     def action_post(self):
@@ -245,6 +250,5 @@ class AccountMove(models.Model):
         # Oculta en el PDF las líneas de contrapartida (neto 0) del impuesto plástico
         lines = super()._get_move_lines_to_report()
         if self.company_id.plastic_hide_counterpart_pdf:
-            lines = lines.filtered(
-                lambda l: not (l.is_plastic_tax_line and l.price_total < 0))
+            lines = lines.filtered(lambda l: not l.is_plastic_counterpart)
         return lines

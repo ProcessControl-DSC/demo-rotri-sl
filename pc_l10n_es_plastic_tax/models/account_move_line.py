@@ -14,8 +14,13 @@ class AccountMoveLine(models.Model):
         digits=(16, 4), store=False,
         help='Kg de plástico no reciclado de la línea (cantidad x kg no reciclado/ud).')
     is_plastic_tax_line = fields.Boolean(
-        string='Línea impuesto plástico', default=False, copy=False,
-        help='Marca las líneas generadas por el impuesto del plástico.')
+        string='Línea impuesto plástico', default=False, copy=True,
+        help='Marca las líneas generadas por el impuesto del plástico. Se copia en '
+             'las facturas rectificativas para registrar la deducción.')
+    is_plastic_counterpart = fields.Boolean(
+        string='Contrapartida impuesto plástico', default=False, copy=True,
+        help='Línea de contrapartida (neto 0) del impuesto del plástico. Se oculta '
+             'en la impresión de la factura.')
 
     @api.depends('quantity', 'product_id')
     def _compute_kg_plastic_total(self):

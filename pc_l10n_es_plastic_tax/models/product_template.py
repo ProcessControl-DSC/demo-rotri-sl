@@ -19,8 +19,8 @@ class ProductTemplate(models.Model):
              'a envase. Se excluye del cálculo.')
     plastic_pct = fields.Float(
         string='% plástico no reciclado', digits=(16, 6),
-        help='Fracción de plástico no reciclado sobre el peso del producto (0-1). '
-             'Solo se usa si la compañía calcula los kg desde el peso.')
+        help='Porcentaje de plástico no reciclado sobre el peso del producto (0-100, '
+             'ej. 50 = 50%). Solo se usa si la compañía calcula los kg desde el peso.')
     kg_plastic_unit = fields.Float(
         string='Kg plástico no reciclado / ud', digits=(16, 6),
         compute='_compute_kg_plastic_unit', store=True, readonly=False,
@@ -44,5 +44,5 @@ class ProductTemplate(models.Model):
             if company.plastic_kg_from_weight and tmpl.plastic_single_use:
                 fname = company.plastic_weight_field_id.name or 'weight'
                 weight = tmpl[fname] if fname in tmpl._fields else (tmpl.weight or 0.0)
-                tmpl.kg_plastic_unit = (weight or 0.0) * (tmpl.plastic_pct or 0.0)
+                tmpl.kg_plastic_unit = (weight or 0.0) * (tmpl.plastic_pct or 0.0) / 100.0
             # si no, se mantiene el valor manual (readonly=False + store)

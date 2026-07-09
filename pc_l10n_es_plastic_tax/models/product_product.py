@@ -24,7 +24,7 @@ class ProductProduct(models.Model):
             if company.plastic_kg_from_weight:
                 fname = company.plastic_weight_field_id.name or 'weight'
                 w = self[fname] if fname in self._fields else (self.weight or 0.0)
-                kg = (w or 0.0) * (self.plastic_pct_var or 0.0)
+                kg = (w or 0.0) * (self.plastic_pct_var or 0.0) / 100.0
             else:
                 kg = self.kg_plastic_unit_var
             return {

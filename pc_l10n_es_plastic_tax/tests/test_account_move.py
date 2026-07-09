@@ -60,6 +60,31 @@ class TestAccountMovePlastic(TransactionCase):
         self.assertEqual(e0['kg_plastic_unit'], 0.2)
         self.assertEqual(e1['kg_plastic_unit'], 0.8)
 
+    def test_kg_from_weight_percentage(self):
+        # 7.1: % se interpreta como porcentaje (0-100), no fracción
+        self.company.plastic_kg_from_weight = True
+        p = self.env['product.product'].create({
+            'name': 'QA tapón', 'type': 'consu', 'plastic_single_use': True,
+            'weight': 0.05, 'plastic_pct': 50.0})
+        self.assertAlmostEqual(p.product_tmpl_id.kg_plastic_unit, 0.025, places=6)
+        self.company.plastic_kg_from_weight = False
+
+    def test_refund_registers_deduction(self):
+        # 7.3: la rectificativa registra la deducción en el libro
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        partner = self.env['res.partner'].create({
+            'name': 'Cliente refund', 'plastic_tax_customer_mode': 'aggregated'})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        move.action_generate_plastic_tax()
+        move.action_post()
+        refund = move._reverse_moves([{'invoice_date': move.invoice_date}])
+        refund.action_post()
+        ded = self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', refund.id), ('entry_type', '=', 'deduction')])
+        self.assertTrue(ded)
+        self.assertLess(ded[0].kg, 0)
+
     def test_exemption_reason_no_tax(self):
         if not self.has_chart:
             self.skipTest("Sin plan contable")
