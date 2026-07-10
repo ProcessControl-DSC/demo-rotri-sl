@@ -129,6 +129,35 @@ class TestAccountMovePlastic(TransactionCase):
         neg = tl.filtered('is_plastic_counterpart')
         self.assertEqual(neg.account_id.code, '700001')   # menos ingreso, no coste
 
+    def test_fiscal_position_region_derivation(self):
+        # La región se deriva sola del país/grupo de la posición fiscal
+        FP = self.env['account.fiscal.position']
+        es = self.env.ref('base.es')
+        eu = self.env.ref('base.europe')
+        us = self.env.ref('base.us')
+        nac = FP.create({'name': 'QA Nacional', 'country_id': es.id})
+        intra = FP.create({'name': 'QA Intra', 'country_group_id': eu.id})
+        extra = FP.create({'name': 'QA Extra', 'country_id': us.id})
+        sin = FP.create({'name': 'QA Sin país'})
+        self.assertEqual(nac.plastic_region, 'national')
+        self.assertEqual(intra.plastic_region, 'intracom')
+        self.assertEqual(extra.plastic_region, 'extracom')
+        # sin país ni grupo → extracom (todo lo que no es nacional ni intracom)
+        self.assertEqual(sin.plastic_region, 'extracom')
+
+    def test_coherence_warning_intracom_sale(self):
+        # Venta con posición intracomunitaria sin exención → aviso (no bloquea)
+        eu = self.env.ref('base.europe')
+        fp = self.env['account.fiscal.position'].create({
+            'name': 'QA Intra venta', 'country_group_id': eu.id})
+        partner = self.env['res.partner'].create({
+            'name': 'Cli UE', 'plastic_tax_customer_mode': 'aggregated',
+            'property_account_position_id': fp.id})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        move.fiscal_position_id = fp.id
+        self.assertTrue(move.plastic_coherence_warning)
+        self.assertIn('intracomunitaria', move.plastic_coherence_warning)
+
     def test_exemption_reason_no_tax(self):
         if not self.has_chart:
             self.skipTest("Sin plan contable")

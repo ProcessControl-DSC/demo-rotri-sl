@@ -6,6 +6,7 @@
         <field name="inherit_id" ref="account.view_account_position_form"/>
         <field name="arch" type="xml">
             <field name="company_id" position="after">
+                <field name="plastic_region"/>
                 <field name="plastic_exempt"/>
                 <field name="plastic_exempt_reason" invisible="not plastic_exempt"/>
             </field>

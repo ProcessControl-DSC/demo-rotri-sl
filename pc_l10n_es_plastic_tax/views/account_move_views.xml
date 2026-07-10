@@ -14,6 +14,10 @@
                             string="Generar impuesto del plástico"
                             class="btn-link"/>
                 </div>
+                <div class="alert alert-info" role="alert"
+                     invisible="not plastic_coherence_warning">
+                    <field name="plastic_coherence_warning" nolabel="1" readonly="1"/>
+                </div>
             </xpath>
             <field name="fiscal_position_id" position="after">
                 <field name="plastic_exemption_reason"/>

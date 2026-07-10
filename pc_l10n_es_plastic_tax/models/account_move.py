@@ -31,6 +31,48 @@ class AccountMove(models.Model):
         string='Requiere impuesto plástico', compute='_compute_plastic_needs_generation')
     plastic_generated = fields.Boolean(string='Impuesto plástico generado', copy=False)
     plastic_footer_note = fields.Text(string='Nota plástico factura', copy=False)
+    plastic_coherence_warning = fields.Text(
+        string='Aviso coherencia plástico', compute='_compute_plastic_coherence_warning',
+        help='Aviso NO bloqueante: la región derivada de la posición fiscal y el modo '
+             'de impuesto del contacto no encajan (p. ej. entrega intracomunitaria sin '
+             'marcar exenta, o compra intracomunitaria sin autoliquidación).')
+
+    @api.depends('partner_id', 'move_type', 'fiscal_position_id',
+                 'fiscal_position_id.plastic_region', 'plastic_exemption_reason')
+    def _compute_plastic_coherence_warning(self):
+        for move in self:
+            move.plastic_coherence_warning = move._plastic_coherence_warning()
+
+    def _plastic_coherence_warning(self):
+        """Detecta combinaciones incoherentes región (posición fiscal) vs modo (contacto).
+
+        Solo avisa; nunca bloquea. Sin posición fiscal en la factura no hay aviso.
+        """
+        self.ensure_one()
+        if self.move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund'):
+            return False
+        region = self.fiscal_position_id.plastic_region
+        if not region:
+            return False
+        mode, is_sale = self._plastic_party_mode()
+        exempt, _r = self._plastic_exemption()
+        if is_sale:
+            # Entregas UE / exportación → exentas (art. 75.1.c)
+            if region in ('intracom', 'extracom') and not exempt and mode in ('aggregated', 'info_included'):
+                label = _('entrega intracomunitaria') if region == 'intracom' else _('exportación')
+                return _("La posición fiscal es de %(label)s (normalmente exenta del "
+                         "impuesto, art. 75.1.c). Márcala como exenta o informa un motivo "
+                         "de exención si corresponde.") % {'label': label}
+        else:
+            # Compra intracomunitaria / importación → el adquirente es sujeto pasivo
+            if region == 'intracom' and mode not in ('self_assessment', 'none'):
+                return _("Compra intracomunitaria: el impuesto suele autoliquidarlo el "
+                         "adquirente. Revisa si el modo del proveedor debería ser "
+                         "'Autoliquidación'.")
+            if region == 'extracom' and mode not in ('self_assessment', 'none'):
+                return _("Importación (extracomunitaria): el impuesto se devenga en la "
+                         "importación (DUA). Revisa el modo del proveedor.")
+        return False
 
     # ---------------------------------------------------------------- helpers
     def _plastic_party_mode(self):
