@@ -22,9 +22,13 @@ class ResCompany(models.Model):
         'account.account', string='Cuenta autoliquidación',
         help='Contrapartida de la autoliquidación intracomunitaria (típicamente 631).')
     plastic_tax_account_cost_id = fields.Many2one(
-        'account.account', string='Cuenta coste (informativa)',
-        help='Contrapartida cuando la tasa está incluida en el precio: es más coste '
-             'de producto (típicamente 600).')
+        'account.account', string='Cuenta coste (informativa compra)',
+        help='Contrapartida en COMPRA cuando la tasa está incluida en el precio: '
+             'más coste de producto (típicamente 600).')
+    plastic_tax_account_income_id = fields.Many2one(
+        'account.account', string='Cuenta ingreso (informativa venta)',
+        help='Contrapartida en VENTA cuando la tasa está incluida en el precio: '
+             'menos ingreso (típicamente 700).')
     plastic_kg_from_weight = fields.Boolean(
         string='Calcular kg desde el peso',
         help='Si se activa, los kg de plástico se calculan como peso del producto '

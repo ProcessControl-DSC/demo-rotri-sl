@@ -19,8 +19,11 @@ class AccountMoveLine(models.Model):
              'las facturas rectificativas para registrar la deducción.')
     is_plastic_counterpart = fields.Boolean(
         string='Contrapartida impuesto plástico', default=False, copy=True,
-        help='Línea de contrapartida (neto 0) del impuesto del plástico. Se oculta '
-             'en la impresión de la factura.')
+        help='Línea de contrapartida (neto 0) del impuesto del plástico.')
+    plastic_hide_in_pdf = fields.Boolean(
+        string='Ocultar en PDF (plástico)', default=False, copy=True,
+        help='Líneas internas del impuesto (neto 0) que no deben imprimirse en la '
+             'factura; solo la tasa realmente repercutida (agregada) se imprime.')
 
     @api.depends('quantity', 'product_id')
     def _compute_kg_plastic_total(self):

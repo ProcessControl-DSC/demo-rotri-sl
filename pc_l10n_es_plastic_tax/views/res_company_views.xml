@@ -21,6 +21,7 @@
                         <field name="plastic_tax_account_output_id"/>
                         <field name="plastic_tax_account_expense_id"/>
                         <field name="plastic_tax_account_cost_id"/>
+                        <field name="plastic_tax_account_income_id"/>
                         <field name="plastic_kg_from_weight"/>
                         <field name="plastic_weight_field_id"
                                invisible="not plastic_kg_from_weight"/>

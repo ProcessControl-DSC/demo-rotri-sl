@@ -85,6 +85,50 @@ class TestAccountMovePlastic(TransactionCase):
         self.assertTrue(ded)
         self.assertLess(ded[0].kg, 0)
 
+    def _plastic_accounts(self):
+        A = self.env['account.account']
+        def acc(code, atype):
+            a = A.search([('code', '=', code)], limit=1)
+            return a or A.create({'code': code, 'name': code, 'account_type': atype})
+        self.company.write({
+            'plastic_tax_account_output_id': acc('475901', 'liability_current').id,
+            'plastic_tax_account_expense_id': acc('631001', 'expense').id,
+            'plastic_tax_account_cost_id': acc('600001', 'expense').id,
+            'plastic_tax_account_income_id': acc('700001', 'income').id,
+            'plastic_tax_minimis_kg': 0})
+
+    def test_self_assessment_accounts(self):
+        # 8.compra: autoliquidación → cargo a 631 (Debe), contrapartida a 475 (Haber)
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        partner = self.env['res.partner'].create({
+            'name': 'Prov UE', 'plastic_tax_supplier_mode': 'self_assessment'})
+        move = self.env['account.move'].create({
+            'move_type': 'in_invoice', 'partner_id': partner.id, 'invoice_date': '2026-05-04',
+            'invoice_line_ids': [(0, 0, {'product_id': self._plastic_product(kg=0.5).id,
+                                         'quantity': 100, 'price_unit': 1})]})
+        move.action_generate_plastic_tax()
+        pos = move.invoice_line_ids.filtered(lambda l: l.is_plastic_tax_line and not l.is_plastic_counterpart)
+        neg = move.invoice_line_ids.filtered('is_plastic_counterpart')
+        self.assertEqual(pos.account_id.code, '631001')   # gasto al Debe
+        self.assertEqual(neg.account_id.code, '475901')   # 475 al Haber
+
+    def test_sale_informativa_income_and_hidden(self):
+        # 8.venta: informativa → contrapartida a 700 y ambas líneas ocultas en PDF
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        partner = self.env['res.partner'].create({
+            'name': 'Cli info', 'plastic_tax_customer_mode': 'info_included'})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        move.action_generate_plastic_tax()
+        tl = move.invoice_line_ids.filtered('is_plastic_tax_line')
+        self.assertEqual(len(tl), 2)
+        self.assertTrue(all(l.plastic_hide_in_pdf for l in tl))  # ninguna se imprime
+        neg = tl.filtered('is_plastic_counterpart')
+        self.assertEqual(neg.account_id.code, '700001')   # menos ingreso, no coste
+
     def test_exemption_reason_no_tax(self):
         if not self.has_chart:
             self.skipTest("Sin plan contable")

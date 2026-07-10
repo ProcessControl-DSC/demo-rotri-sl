@@ -168,6 +168,7 @@ class AccountMove(models.Model):
             acc_out = company.plastic_tax_account_output_id
             acc_exp = company.plastic_tax_account_expense_id
             acc_cost = company.plastic_tax_account_cost_id
+            acc_income = company.plastic_tax_account_income_id
             new_lines, tot_amount, tot_kg = [], 0.0, 0.0
             for r in res:
                 prod = prod_by_key.get(r['tariff_key']) or default_prod
@@ -182,13 +183,20 @@ class AccountMove(models.Model):
                              else _('Impuesto plástico - contrapartida')),
                 }
                 if r['kind'] == 'tax':
-                    if acc_out:
-                        vals['account_id'] = acc_out.id
-                else:  # contrapartida: coste (informativa) o autoliquidación (UE)
+                    # autoliquidación: el cargo va al gasto (631, Debe); si no, a la 475
+                    acc = acc_exp if r.get('self_assessment') else acc_out
+                else:  # contrapartida
                     vals['is_plastic_counterpart'] = True
-                    cp_acc = acc_exp if r.get('cp_kind') == 'autoliq' else acc_cost
-                    if cp_acc:
-                        vals['account_id'] = cp_acc.id
+                    if r.get('cp_kind') == 'autoliq':
+                        acc = acc_out          # 475 al Haber (importe a ingresar)
+                    elif is_sale:
+                        acc = acc_income       # 700: menos ingreso (venta informativa)
+                    else:
+                        acc = acc_cost         # 600: más coste (compra informativa)
+                if acc:
+                    vals['account_id'] = acc.id
+                # neto 0 (informativa/autoliquidación) no se imprime; solo el cargo agregado
+                vals['plastic_hide_in_pdf'] = (r['kind'] == 'counterpart') or (not r.get('charged'))
                 # IVA solo en el cargo real de venta (agregada); nunca en el neto 0
                 if is_sale and r['kind'] == 'tax' and r.get('charged') and sale_tax:
                     vals['tax_ids'] = [(6, 0, sale_tax.ids)]
@@ -250,5 +258,5 @@ class AccountMove(models.Model):
         # Oculta en el PDF las líneas de contrapartida (neto 0) del impuesto plástico
         lines = super()._get_move_lines_to_report()
         if self.company_id.plastic_hide_counterpart_pdf:
-            lines = lines.filtered(lambda l: not l.is_plastic_counterpart)
+            lines = lines.filtered(lambda l: not l.plastic_hide_in_pdf)
         return lines
