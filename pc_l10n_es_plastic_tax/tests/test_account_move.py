@@ -114,6 +114,44 @@ class TestAccountMovePlastic(TransactionCase):
         self.assertEqual(pos.account_id.code, '631001')   # gasto al Debe
         self.assertEqual(neg.account_id.code, '475901')   # 475 al Haber
 
+    def _purchase(self, supplier_mode, kg=0.5, qty=100):
+        partner = self.env['res.partner'].create({
+            'name': 'Prov ' + supplier_mode, 'plastic_tax_supplier_mode': supplier_mode})
+        return self.env['account.move'].create({
+            'move_type': 'in_invoice', 'partner_id': partner.id, 'invoice_date': '2026-05-04',
+            'invoice_line_ids': [(0, 0, {'product_id': self._plastic_product(kg=kg).id,
+                                         'quantity': qty, 'price_unit': 1})]})
+
+    def test_purchase_national_info_is_cost_not_475(self):
+        # Compra nacional informativa: el proveedor liquida el 592 -> la tasa es coste
+        # (631), no 475; y no entra en el libro registro.
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        move = self._purchase('info_included')
+        move.action_generate_plastic_tax()
+        pos = move.invoice_line_ids.filtered(lambda l: l.is_plastic_tax_line and not l.is_plastic_counterpart)
+        self.assertEqual(pos.account_id.code, '631001')   # coste, NUNCA 475
+        move.action_post()
+        led = self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', move.id), ('exempt', '=', False)])
+        self.assertFalse(led)   # compra nacional fuera del libro 592
+
+    def test_purchase_national_aggregated_is_cost_not_475(self):
+        # Compra nacional agregada (línea aparte): coste 631, sin contrapartida, fuera del libro
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        move = self._purchase('aggregated')
+        move.action_generate_plastic_tax()
+        pos = move.invoice_line_ids.filtered('is_plastic_tax_line')
+        self.assertEqual(len(pos), 1)
+        self.assertEqual(pos.account_id.code, '631001')
+        move.action_post()
+        led = self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', move.id), ('exempt', '=', False)])
+        self.assertFalse(led)
+
     def test_sale_informativa_income_and_hidden(self):
         # 8.venta: informativa → contrapartida a 700 y ambas líneas ocultas en PDF
         if not self.has_chart:

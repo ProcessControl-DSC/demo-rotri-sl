@@ -225,8 +225,13 @@ class AccountMove(models.Model):
                              else _('Impuesto plástico - contrapartida')),
                 }
                 if r['kind'] == 'tax':
-                    # autoliquidación: el cargo va al gasto (631, Debe); si no, a la 475
-                    acc = acc_exp if r.get('self_assessment') else acc_out
+                    # Sujeto pasivo del 592: en VENTA nacional la empresa repercute y
+                    # liquida -> 475. En COMPRA la empresa nunca liquida el 592 en
+                    # nacional (lo hace el proveedor) -> es coste (631); en compra
+                    # intracomunitaria autoliquida -> el cargo va al gasto 631 y la
+                    # contrapartida a la 475. Por tanto toda línea de tasa de compra
+                    # va a 631, nunca a la 475.
+                    acc = acc_out if is_sale else acc_exp
                 else:  # contrapartida
                     vals['is_plastic_counterpart'] = True
                     if r.get('cp_kind') == 'autoliq':
@@ -277,6 +282,12 @@ class AccountMove(models.Model):
                 continue
             mode, _is = move._plastic_party_mode()
             sa = (mode == 'self_assessment')
+            # El libro registro del 592 solo recoge las operaciones en las que la
+            # empresa es sujeto pasivo (líneas a la 475): ventas nacionales y compras
+            # intracomunitarias (autoliquidación). Las compras nacionales las liquida
+            # el proveedor; su tasa es coste (631) y no entra en el libro.
+            if not is_sale and not sa:
+                continue
             for l in move.invoice_line_ids.filtered(
                     lambda x: x.is_plastic_tax_line and not x.is_plastic_counterpart
                     and x.price_unit > 0):
