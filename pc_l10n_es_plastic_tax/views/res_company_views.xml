@@ -26,6 +26,7 @@
                         <field name="plastic_weight_field_id"
                                invisible="not plastic_kg_from_weight"/>
                         <field name="plastic_exempt_from_fiscal_pos"/>
+                        <field name="plastic_first_seller"/>
                         <field name="plastic_hide_counterpart_pdf"/>
                     </group>
                 </group>

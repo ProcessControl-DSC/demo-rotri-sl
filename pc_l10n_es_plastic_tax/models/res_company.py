@@ -23,8 +23,9 @@ class ResCompany(models.Model):
         help='Contrapartida de la autoliquidación intracomunitaria (típicamente 631).')
     plastic_tax_account_cost_id = fields.Many2one(
         'account.account', string='Cuenta coste (informativa compra)',
-        help='Contrapartida en COMPRA cuando la tasa está incluida en el precio: '
-             'más coste de producto (típicamente 600).')
+        help='Contrapartida en COMPRA nacional cuando la tasa está incluida en el '
+             'precio: se abona aquí para reclasificar el importe del plástico del '
+             'coste de compra al tributo (631), a neto cero (típicamente 600).')
     plastic_tax_account_income_id = fields.Many2one(
         'account.account', string='Cuenta ingreso (informativa venta)',
         help='Contrapartida en VENTA cuando la tasa está incluida en el precio: '
@@ -42,6 +43,13 @@ class ResCompany(models.Model):
         string='Exención por posición fiscal', default=True,
         help='Deriva la exención (exportación / intracomunitaria) de la posición '
              'fiscal de la factura.')
+    plastic_first_seller = fields.Boolean(
+        string='Fabricante o primer vendedor', default=True,
+        help='La empresa fabrica o es el primer vendedor en territorio nacional, por '
+             'lo que es sujeto pasivo del 592 y repercute el impuesto en ventas '
+             'nacionales. Desmárcalo si la empresa es solo distribuidora (el impuesto '
+             'ya lo devengó el proveedor o la importación): entonces la factura avisa '
+             'si una venta nacional intenta repercutir el impuesto de nuevo.')
     plastic_hide_counterpart_pdf = fields.Boolean(
         string='Ocultar contrapartida en PDF', default=True)
     plastic_mo_registration = fields.Selection(

@@ -38,7 +38,8 @@ class AccountMove(models.Model):
              'marcar exenta, o compra intracomunitaria sin autoliquidación).')
 
     @api.depends('partner_id', 'move_type', 'fiscal_position_id',
-                 'fiscal_position_id.plastic_region', 'plastic_exemption_reason')
+                 'fiscal_position_id.plastic_region', 'plastic_exemption_reason',
+                 'company_id.plastic_first_seller')
     def _compute_plastic_coherence_warning(self):
         for move in self:
             move.plastic_coherence_warning = move._plastic_coherence_warning()
@@ -51,11 +52,22 @@ class AccountMove(models.Model):
         self.ensure_one()
         if self.move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund'):
             return False
-        region = self.fiscal_position_id.plastic_region
-        if not region:
-            return False
         mode, is_sale = self._plastic_party_mode()
         exempt, _r = self._plastic_exemption()
+        region = self.fiscal_position_id.plastic_region
+        # Doble devengo: la empresa NO es fabricante/primer vendedor y aun así una
+        # venta nacional intenta repercutir el impuesto (ya lo devengó un eslabón
+        # anterior). El impuesto es monofásico. Cubre también la venta sin posición
+        # fiscal (nacional por defecto), por eso va antes del corte por región.
+        if (is_sale and not exempt and mode in ('aggregated', 'info_included')
+                and not self.company_id.plastic_first_seller
+                and region in ('national', False)):
+            return _("La empresa no está marcada como fabricante ni primer vendedor: "
+                     "en una venta nacional el impuesto ya lo devengó el proveedor o "
+                     "la importación. Revisa si el modo del cliente debería ser 'No "
+                     "aplica' para no duplicar el impuesto (es monofásico).")
+        if not region:
+            return False
         if is_sale:
             # Entregas UE / exportación → exentas (art. 75.1.c)
             if region in ('intracom', 'extracom') and not exempt and mode in ('aggregated', 'info_included'):
@@ -175,12 +187,17 @@ class AccountMove(models.Model):
             # Minimis por periodo: acumulado de plástico de las facturas confirmadas
             # del periodo (cuenten o no cuota), para que fraccionar no evite el impuesto
             start, end = move._plastic_period_range()
-            move_types = ('out_invoice', 'out_refund') if is_sale else ('in_invoice', 'in_refund')
-            prev = self.env['account.move'].search([
-                ('company_id', '=', company.id), ('move_type', 'in', move_types),
-                ('state', '=', 'posted'), ('invoice_date', '>=', start),
-                ('invoice_date', '<=', end), ('id', '!=', move.id)])
-            period_kg = sum(mv._plastic_source_kg() for mv in prev)
+            inv_type = 'out_invoice' if is_sale else 'in_invoice'
+            ref_type = 'out_refund' if is_sale else 'in_refund'
+            base_dom = [('company_id', '=', company.id), ('state', '=', 'posted'),
+                        ('invoice_date', '>=', start), ('invoice_date', '<=', end),
+                        ('id', '!=', move.id)]
+            prev_inv = self.env['account.move'].search(base_dom + [('move_type', '=', inv_type)])
+            prev_ref = self.env['account.move'].search(base_dom + [('move_type', '=', ref_type)])
+            # Las rectificativas del periodo RESTAN del acumulado (antes sumaban en
+            # positivo e inflaban el minimis).
+            period_kg = (sum(mv._plastic_source_kg() for mv in prev_inv)
+                         - sum(mv._plastic_source_kg() for mv in prev_ref))
             minimis = company.plastic_tax_minimis_kg or 0.0
             if minimis and (period_kg + total_kg) < minimis:
                 move.plastic_footer_note = False
@@ -207,6 +224,7 @@ class AccountMove(models.Model):
                 move.plastic_generated = True
                 continue
             sale_tax = company.account_sale_tax_id if is_sale else False
+            purchase_tax = company.account_purchase_tax_id if not is_sale else False
             acc_out = company.plastic_tax_account_output_id
             acc_exp = company.plastic_tax_account_expense_id
             acc_cost = company.plastic_tax_account_cost_id
@@ -244,9 +262,12 @@ class AccountMove(models.Model):
                     vals['account_id'] = acc.id
                 # neto 0 (informativa/autoliquidación) no se imprime; solo el cargo agregado
                 vals['plastic_hide_in_pdf'] = (r['kind'] == 'counterpart') or (not r.get('charged'))
-                # IVA solo en el cargo real de venta (agregada); nunca en el neto 0
-                if is_sale and r['kind'] == 'tax' and r.get('charged') and sale_tax:
-                    vals['tax_ids'] = [(6, 0, sale_tax.ids)]
+                # IVA solo en el cargo REAL agregado (línea que se factura de verdad):
+                # venta agregada repercute IVA; compra agregada soporta IVA deducible.
+                # Nunca en el neto 0 (informativa/autoliquidación/contrapartidas).
+                if r['kind'] == 'tax' and r.get('charged'):
+                    vat = sale_tax if is_sale else purchase_tax
+                    vals['tax_ids'] = [(6, 0, vat.ids)] if vat else [(5, 0, 0)]
                 else:
                     vals['tax_ids'] = [(5, 0, 0)]
                 new_lines.append((0, 0, vals))
@@ -272,21 +293,25 @@ class AccountMove(models.Model):
             total_kg = move._plastic_source_kg()
             if total_kg <= 0:
                 continue
-            base_type = 'sold' if is_sale else 'purchased'
-            if exempt:
-                Ledger.create({
-                    'name': move.name or _('Factura'), 'date': move.invoice_date or fields.Date.context_today(move),
-                    'entry_type': base_type, 'kg': round(total_kg, 4), 'amount': 0.0,
-                    'exempt': True, 'exemption_reason': reason,
-                    'move_id': move.id, 'company_id': move.company_id.id})
-                continue
             mode, _is = move._plastic_party_mode()
             sa = (mode == 'self_assessment')
-            # El libro registro del 592 solo recoge las operaciones en las que la
-            # empresa es sujeto pasivo (líneas a la 475): ventas nacionales y compras
+            # El libro registro del 592 solo recoge operaciones en las que la empresa
+            # es sujeto pasivo (líneas a la 475): ventas nacionales y compras
             # intracomunitarias (autoliquidación). Las compras nacionales las liquida
-            # el proveedor; su tasa es coste (631) y no entra en el libro.
+            # el proveedor -> su tasa es coste (631) y nunca entra en el libro, ni
+            # siquiera con un motivo de exención manual informado.
             if not is_sale and not sa:
+                continue
+            base_type = 'sold' if is_sale else 'purchased'
+            if exempt:
+                # La rectificativa de una venta exenta resta el volumen exento
+                sign = -1 if is_refund else 1
+                Ledger.create({
+                    'name': move.name or _('Factura'), 'date': move.invoice_date or fields.Date.context_today(move),
+                    'entry_type': 'deduction' if is_refund else base_type,
+                    'kg': round(total_kg * sign, 4), 'amount': 0.0,
+                    'exempt': True, 'exemption_reason': reason,
+                    'move_id': move.id, 'company_id': move.company_id.id})
                 continue
             for l in move.invoice_line_ids.filtered(
                     lambda x: x.is_plastic_tax_line and not x.is_plastic_counterpart
@@ -302,7 +327,30 @@ class AccountMove(models.Model):
                     'self_assessment': sa,
                     'move_id': move.id, 'company_id': move.company_id.id})
 
+    def _plastic_should_generate(self):
+        """La factura tiene plástico y una obligación (modo != none o exención)."""
+        self.ensure_one()
+        if self.move_type not in ('out_invoice', 'out_refund', 'in_invoice', 'in_refund'):
+            return False
+        mode, _is = self._plastic_party_mode()
+        exempt, _r = self._plastic_exemption()
+        has_plastic = any(
+            l.plastic_single_use and not l.is_plastic_tax_line
+            for l in self.invoice_line_ids)
+        return bool(has_plastic and (mode != 'none' or exempt))
+
     def action_post(self):
+        # Fail-safe: regenerar la tasa al confirmar aunque el usuario no haya pulsado
+        # el botón o haya editado líneas tras generarla. Evita contabilizar una factura
+        # con plástico sin la línea a la 475 ni el apunte del libro (infra-declaración
+        # del 592). Solo facturas (no rectificativas: estas replican por copia y su
+        # deducción se calcula en el libro). action_generate exige borrador.
+        to_gen = self.filtered(
+            lambda m: m.state == 'draft'
+            and m.move_type in ('out_invoice', 'in_invoice')
+            and m._plastic_should_generate())
+        if to_gen:
+            to_gen.action_generate_plastic_tax()
         res = super().action_post()
         self._plastic_create_ledger()
         return res

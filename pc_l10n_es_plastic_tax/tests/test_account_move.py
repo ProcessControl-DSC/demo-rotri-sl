@@ -196,6 +196,76 @@ class TestAccountMovePlastic(TransactionCase):
         self.assertTrue(move.plastic_coherence_warning)
         self.assertIn('intracomunitaria', move.plastic_coherence_warning)
 
+    def test_post_autogenerates_on_confirm(self):
+        # ALTA: si el usuario confirma sin pulsar "Generar", la tasa se genera sola
+        # al confirmar (no puede quedar factura con plástico fuera de la 475/libro)
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        partner = self.env['res.partner'].create({
+            'name': 'Cli auto', 'plastic_tax_customer_mode': 'aggregated'})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        self.assertTrue(move.plastic_needs_generation)
+        move.action_post()   # SIN action_generate_plastic_tax previo
+        self.assertTrue(move.invoice_line_ids.filtered('is_plastic_tax_line'))
+        self.assertTrue(self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', move.id), ('exempt', '=', False)]))
+
+    def test_exempt_sale_refund_subtracts_in_ledger(self):
+        # La rectificativa de una venta exenta RESTA el volumen exento del libro
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        partner = self.env['res.partner'].create({
+            'name': 'Cli exento', 'plastic_tax_customer_mode': 'info_included'})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        move.plastic_exemption_reason = 'export'
+        move.action_post()
+        led = self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', move.id), ('exempt', '=', True)])
+        self.assertTrue(led and led.kg > 0)
+        refund = move._reverse_moves([{'invoice_date': move.invoice_date}])
+        refund.action_post()
+        dled = self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', refund.id), ('exempt', '=', True)])
+        self.assertTrue(dled and dled.kg < 0)   # resta, no suma
+
+    def test_purchase_national_manual_exempt_not_in_ledger(self):
+        # Compra nacional con motivo de exención manual: nunca entra en el libro
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        move = self._purchase('info_included')
+        move.plastic_exemption_reason = 'sanitary'
+        move.action_post()
+        self.assertFalse(self.env['l10n_es.plastic.ledger'].search(
+            [('move_id', '=', move.id)]))
+
+    def test_coherence_warning_first_seller(self):
+        # Doble devengo: si la empresa NO es primer vendedor, una venta nacional que
+        # repercute avisa; si lo es (default), no avisa.
+        partner = self.env['res.partner'].create({
+            'name': 'Cli nac', 'plastic_tax_customer_mode': 'aggregated'})
+        move = self._invoice(partner, self._plastic_product(kg=0.5))
+        self.company.plastic_first_seller = True
+        move.invalidate_recordset(['plastic_coherence_warning'])
+        self.assertFalse(move.plastic_coherence_warning)
+        self.company.plastic_first_seller = False
+        move.invalidate_recordset(['plastic_coherence_warning'])
+        self.assertTrue(move.plastic_coherence_warning)
+        self.assertIn('primer vendedor', move.plastic_coherence_warning)
+        self.company.plastic_first_seller = True
+
+    def test_purchase_aggregated_has_input_vat(self):
+        # Compra agregada: la línea real de coste (631) soporta IVA deducible
+        if not self.has_chart:
+            self.skipTest("Sin plan contable")
+        self._plastic_accounts()
+        move = self._purchase('aggregated')
+        move.action_generate_plastic_tax()
+        pos = move.invoice_line_ids.filtered('is_plastic_tax_line')
+        if self.company.account_purchase_tax_id:
+            self.assertTrue(pos.tax_ids, "la compra agregada debe soportar IVA deducible")
+
     def test_exemption_reason_no_tax(self):
         if not self.has_chart:
             self.skipTest("Sin plan contable")

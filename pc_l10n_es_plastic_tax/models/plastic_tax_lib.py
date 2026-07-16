@@ -64,8 +64,10 @@ def compute_plastic_tax_lines(invoice_lines, party_mode, is_sale,
     cp_kind = 'autoliq' if sa else 'cost'
     result = []
     for key, kg in tariff_kgs.items():
-        amount = round(kg * rate, 2)
+        # redondear primero los kg y derivar el importe de ese kg redondeado, para
+        # que la nota al pie y el libro registro (que parten del kg redondeado) cuadren
         kg = round(kg, 4)
+        amount = round(kg * rate, 2)
         result.append({'tariff_key': key, 'kg': kg, 'amount': amount, 'sign': 1,
                        'kind': 'tax', 'self_assessment': sa, 'charged': charged})
         if not charged:

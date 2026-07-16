@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Impuesto sobre envases de plástico no reutilizables',
-    'version': '19.0.4.4.0',
+    'version': '19.0.4.6.0',
     'summary': 'Impuesto especial del plástico (Ley 7/2022) en compras y ventas',
     'description': """
 <div style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
